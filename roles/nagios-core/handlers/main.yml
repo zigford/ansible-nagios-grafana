@@ -1,0 +1,8 @@
+---
+# handlers file for nagios
+
+- name: apache
+  systemd:
+    name: apache2
+    state: restarted
+  become: true

@@ -1,0 +1,137 @@
+---
+# tasks file for grafana
+
+- name: Ensure grafana pre-reqs are installed.
+  community.general.zypper:
+    name:
+      - tar
+      - gzip
+    state: present
+  become: true
+
+- name: Ensure dists directory is created.
+  file:
+    dest: /usr/local/dists
+    state: directory
+    mode: u=rwX,g=rX,o=rX
+  become: true
+
+- name: Ensure grafana install is downloaded.
+  get_url:
+    url: "https://dl.grafana.com/oss/release/grafana-{{
+          grafana_ver }}.linux-amd64.tar.gz"
+    dest: /usr/local/dists
+    checksum: sha256:{{ grafana_sha }}
+  retries: 6
+  delay: 3
+  register: grafana_dl
+  become: true
+
+- name: Ensure grafana install dir is created.
+  file:
+    dest: /opt/grafana
+    state: directory
+    mode: u=rwX,g=rwX,o=rX
+  become: true
+
+- name: Unarchive grafana binaries
+  unarchive:
+    remote_src: yes
+    dest: /opt/grafana
+    src: "{{ grafana_dl.dest }}"
+    creates: /opt/grafana/bin/grafana-server
+    mode: u=rwX,g=rwX,o=rX
+    extra_opts:
+      - --strip-components
+      - '1'
+  become: true
+
+- name: Install systemd service.
+  template:
+    src: grafana-server.service
+    dest: /usr/lib/systemd/system/
+  become: true
+
+- name: Install sysconfig file.
+  template:
+    src: grafana-server
+    dest: /etc/sysconfig/grafana-server
+  become: true
+
+- name: Create grafana group.
+  group:
+    name: grafana
+    system: false
+    state: present
+  become: true
+
+- name: Create grafana user.
+  user:
+    name: grafana
+    groups:
+      - grafana
+    system: false
+    state: present
+  become: true
+
+- name: Create initial config.
+  copy:
+    remote_src: true
+    src: /opt/grafana/conf/sample.ini
+    dest: /opt/grafana/conf/grafana.ini
+  become: true
+
+- name: Ensure log directory is created.
+  file:
+    dest: /var/log/grafana
+    owner: grafana
+    group: grafana
+    mode: u=rwX,g=rwX,o=rX
+    state: directory
+  become: true
+
+- name: Ensure db directory is created.
+  file:
+    dest: /var/lib/grafana
+    owner: grafana
+    group: grafana
+    mode: u=rwX,g=rwX,o=rX
+    state: directory
+  become: true
+
+- name: Ensure grafana is enabled and running.
+  systemd:
+    name: grafana-server
+    enabled: true
+    state: started
+    daemon_reload: true
+  become: true
+
+- name: Check if grafana password needs updating.
+  uri:
+    url: http://localhost:3000/api/user
+    force_basic_auth: true
+    user: admin
+    password: "{{ old_grafana_admin_password }}"
+    method: GET
+  failed_when:
+    - grafana_user.status != 401
+    - grafana_user.status != 200
+  register: grafana_user
+
+- debug: var=grafana_user
+
+- name: Set grafana admin password.
+  uri:
+    url: http://localhost:3000/api/user/password
+    force_basic_auth: true
+    user: admin
+    password: admin
+    method: PUT
+    body_format: json
+    body:
+      oldPassword: "{{ old_grafana_admin_password }}"
+      newPassword: "{{ grafana_admin_password }}"
+      confirmNew: "{{ grafana_admin_password }}"
+  when: grafana_user.status == 200
+  register: grafana_pwd_change

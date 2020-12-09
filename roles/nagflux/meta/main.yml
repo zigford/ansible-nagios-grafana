@@ -1,0 +1,14 @@
+galaxy_info:
+  author: Jesse Harris
+  description: nagflux
+  company: USC
+  license: MIT
+  min_ansible_version: 2.9
+  platforms:
+  - name: opensuse
+    versions:
+    - 15.1
+  galaxy_tags: []
+dependencies:
+  - role: nagios-core
+  - role: influxdb

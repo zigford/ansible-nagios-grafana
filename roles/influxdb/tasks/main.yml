@@ -1,0 +1,42 @@
+---
+# tasks file for influxdb
+
+- name: Set distro fact.
+  set_fact:
+    distro: "{{ ansible_distribution }}_\
+             {{ ansible_distribution_major_version }}_\
+             {{ ansible_distribution_release }}"
+
+- name: Load distro vars.
+  include_vars:
+    file: "{{ distro }}.yml"
+
+- name: Ensure server repo is added.
+  community.general.zypper_repository:
+    name: server
+    repo: "{{ influx_repo_url }}"
+    auto_import_keys: true
+  become: yes
+  when: influx_repo_url is defined
+
+- name: Ensure go repo is added.
+  community.general.zypper_repository:
+    name: go
+    repo: "{{ go_repo_url }}"
+    auto_import_keys: true
+  become: yes
+  when: go_repo_url is defined
+
+- name: Ensure influxdb is installed.
+  community.general.zypper:
+    name: influxdb
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Ensure influxdb is enabled and running.
+  service:
+    name: influxdb
+    enabled: true
+    state: started
+  become: true

@@ -1,0 +1,7 @@
+---
+# handlers file for nagflux
+- name: nagios
+  systemd:
+    name: nagios
+    state: restarted
+  become: true

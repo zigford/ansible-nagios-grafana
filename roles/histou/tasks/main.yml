@@ -1,0 +1,78 @@
+---
+# tasks file for histou
+
+- name: Ensure histou pre-reqs are installed.
+  community.general.zypper:
+    name:
+      - tar
+      - gzip
+      - php7-json
+    state: present
+    update_cache: true
+  notify: apache
+  become: true
+
+- name: Ensure dists directory is created.
+  file:
+    dest: /usr/local/dists
+    state: directory
+    mode: u=rwX,g=rX,o=rX
+  become: true
+
+- name: Ensure histou is downloaded.
+  get_url:
+    url: "https://github.com/Griesbacher/histou/archive/v{{
+          histou_ver }}.tar.gz"
+    dest: /usr/local/dists
+    # checksum: sha256:{{ histou_sha }}
+  retries: 6
+  delay: 3
+  register: histou_dl
+
+- name: Ensure histou directory is created.
+  file:
+    dest: /srv/www/htdocs/histou
+    state: directory
+    mode: u=rwX,g=rwX,o=rX
+  become: true
+
+- name: Unarchive histou binaries
+  unarchive:
+    remote_src: yes
+    dest: /srv/www/htdocs/histou
+    src: "{{ histou_dl.dest }}"
+    # creates: "{{ }}"
+    mode: u=rwX,g=rwX,o=rX
+    extra_opts:
+      - --strip-components
+      - '1'
+  become: true
+
+- name: Install histou config.
+  copy:
+    remote_src: true
+    src: /srv/www/htdocs/histou/histou.ini.example
+    dest: /srv/www/htdocs/histou/histou.ini
+  become: true
+
+- name: Ensure grafana dashboard dir is created.
+  file:
+    dest: /opt/grafana/public/dashboards
+    state: directory
+    mode: u=rwX,g=rwX,o=rX
+  become: true
+
+- name: Install histou js.
+  copy:
+    remote_src: true
+    src: /srv/www/htdocs/histou/histou.js
+    force: false
+    dest: /opt/grafana/public/dashboards/
+  become: true
+
+- name: Configure histou.js
+  lineinfile:
+    regexp: var url =
+    line: var url = 'http://{{ nagios_hostname }}/histou/'; 
+    path: /opt/grafana/public/dashboards/histou.js
+  become: true

@@ -1,0 +1,39 @@
+---
+- hosts: all
+  vars:
+    nagios_hostname: 192.168.13.1
+  handlers:
+    - name: nagios
+      systemd:
+        name: nagios
+        state: restarted
+      become: true
+  roles:
+    - nagios-core
+    - nagios-plugins
+    - nagflux
+    - histou
+    - grafana
+  tasks:
+    - name: Add influxdb data source to grafana.
+      community.grafana.grafana_datasource:
+        name: nagflux
+        ds_type: influxdb
+        ds_url: http://localhost:8086
+        grafana_url: http://localhost:3000
+        database: nagflux
+        url_username: admin
+        url_password: password
+        access: proxy
+
+    - name: Add action_url to service definition.
+      lineinfile:
+        path: /usr/local/nagios/etc/objects/templates.cfg
+        insertafter: generic-service
+        firstmatch: true
+        regexp: action_url
+        line: "    action_url                      \
+          http://{{ nagios_hostname }}:3000/\
+          dashboard/script/histou.js?host=$HOSTNAME$&service=$SERVICEDESC$"
+      become: true
+      notify: nagios

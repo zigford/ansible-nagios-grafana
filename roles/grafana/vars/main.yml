@@ -1,0 +1,7 @@
+---
+# vars file for grafana
+grafana_ver: 7.3.4
+grafana_sha: 9343b2b7c8784fa7ac62f03137bcf05f114bef404d2d57dc6f5cbcb61cd3aeba
+
+grafana_admin_password: password
+old_grafana_admin_password: admin

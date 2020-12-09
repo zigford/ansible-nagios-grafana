@@ -1,0 +1,120 @@
+---
+
+- name: Enable performance data processing
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: process_performance_data
+    line: process_performance_data=1
+  become: true
+  notify: nagios
+
+- name: Set host perfdata file
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: host_perfdata_file=
+    line: host_perfdata_file=/usr/local/nagios/var/host-perfdata
+  become: true
+  notify: nagios
+
+- name: Set host perfdata template
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: host_perfdata_file_template
+    line: "host_perfdata_file_template=DATATYPE::HOSTPERFDATA\\t\
+           TIMET::$TIMET$\\tHOSTNAME::$HOSTNAME$\\tHOSTPERFDATA::$HOSTPERFDATA$\\t\
+           HOSTCHECKCOMMAND::$HOSTCHECKCOMMAND$"
+  become: true
+  notify: nagios
+
+- name: Set host perfdata mode
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: host_perfdata_file_mode
+    line: host_perfdata_file_mode=a
+  become: true
+  notify: nagios
+
+- name: Set host perfdata processing interval
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: host_perfdata_file_processing_interval
+    line: host_perfdata_file_processing_interval=15
+  become: true
+  notify: nagios
+
+- name: Set host perfdata processing command
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: host_perfdata_file_processing_command
+    line: host_perfdata_file_processing_command=process-host-perfdata-file-nagflux
+  become: true
+  notify: nagios
+
+- name: Set service perfdata file
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: service_perfdata_file=
+    line: service_perfdata_file=/usr/local/nagios/var/service-perfdata
+  become: true
+  notify: nagios
+
+- name: Set service perfdata template
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: service_perfdata_file_template
+    line: "service_perfdata_file_template=DATATYPE::SERVICEPERFDATA\\t\
+           TIMET::$TIMET$\\tHOSTNAME::$HOSTNAME$\\tSERVICEDESC::$SERVICEDESC$\\t\
+           SERVICEPERFDATA::$SERVICEPERFDATA$\\t\
+           SERVICECHECKCOMMAND::$SERVICECHECKCOMMAND$"
+  become: true
+  notify: nagios
+
+- name: Set service perfdata mode
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: service_perfdata_file_mode
+    line: service_perfdata_file_mode=a
+  become: true
+  notify: nagios
+
+- name: Set service perfdata processing interval
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: service_perfdata_file_processing_interval
+    line: service_perfdata_file_processing_interval=15
+  become: true
+  notify: nagios
+
+- name: Set service perfdata processing command
+  lineinfile:
+    path: /usr/local/nagios/etc/nagios.cfg
+    regexp: service_perfdata_file_processing_command
+    line: service_perfdata_file_processing_command=process-service-perfdata-file-nagflux
+  become: true
+  notify: nagios
+
+- name: Add host perfdata command to commands.cfg
+  blockinfile:
+    path: /usr/local/nagios/etc/objects/commands.cfg
+    marker: '# {mark} Ansible managed block for host perfdata'
+    block: |
+      define command {
+
+          command_name    process-host-perfdata-file-nagflux
+          command_line    /bin/mv /usr/local/nagios/var/host-perfdata /usr/local/nagios/var/spool/nagfluxperfdata/$TIMET$.perfdata.host
+      }
+  become: true
+  notify: nagios
+
+- name: Add service perfdata command to commands.cfg
+  blockinfile:
+    path: /usr/local/nagios/etc/objects/commands.cfg
+    marker: '# {mark} Ansible managed block for service perfdata'
+    block: |
+      define command {
+
+          command_name    process-service-perfdata-file-nagflux
+          command_line    /bin/mv /usr/local/nagios/var/service-perfdata /usr/local/nagios/var/spool/nagfluxperfdata/$TIMET$.perfdata.service
+      }
+  become: true
+  notify: nagios

@@ -1,0 +1,71 @@
+---
+# tasks file for nagios-plugins
+
+- name: Ensure nagios plugin pre-reqs are installed.
+  community.general.zypper:
+    name:
+      - autoconf
+      - automake
+      - gcc
+      - gettext
+      - gettext-runtime
+      - glibc
+      - libgcrypt-devel
+      - libopenssl-devel
+      - make
+      - net-snmp
+      - perl-Net-SNMP
+      - wget
+      - iputils
+    state: present
+  become: true
+
+- name: Ensure source directory is present.
+  file:
+    path: "{{ src_dir }}"
+    mode: u=rwX,g=rwX,o=rX
+    state: directory
+    group: users
+  become: yes
+
+- name: Ensure source is downloaded.
+  get_url:
+    url: "https://github.com/nagios-plugins/nagios-plugins/releases/\
+          download/release-{{ plugins_ver }}/nagios-plugins-\
+          {{ plugins_ver }}.tar.gz"
+    dest: "{{ src_dir }}/"
+    checksum: sha256:{{ plugins_sha }}
+  retries: 6
+  delay: 3
+  register: plugins_dl
+
+- name: Register nagios source fact.
+  set_fact:
+    plugins_src: "{{ src_dir }}/nagios-plugins-{{ plugins_ver }}"
+
+- name: Unarchive nagios contents.
+  unarchive:
+    remote_src: yes
+    dest: "{{ src_dir }}"
+    src: "{{ plugins_dl.dest }}"
+    creates: "{{ plugins_src }}"
+    mode: u=rwX,g=rwX,o=rX
+
+- name: Configure nagios plugins for compilation.
+  command: ./configure
+  args:
+    chdir: "{{ plugins_src }}"
+    creates: "{{ plugins_src }}/Makefile"
+
+- name: Compile nagios plugins.
+  command: make
+  args:
+    chdir: "{{ plugins_src }}"
+    creates: "{{ plugins_src }}/plugins/check_ping"
+
+- name: Install nagios plugin binaries.
+  command: make install
+  args:
+    chdir: "{{ plugins_src }}"
+    creates: /usr/local/nagios/libexec/check_ping
+  become: true

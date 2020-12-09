@@ -1,0 +1,6 @@
+---
+# vars file for nagios
+#
+src_dir: /usr/local/src/nagios
+nagios_ver: 4.4.6
+nagios_sha: b1c6fb447f14995ea691941edd928ff4532b9e240e5058bac58b14eec14ceca1

@@ -1,0 +1,154 @@
+---
+# tasks file for nagios
+
+- name: Ensure nagios pre-reqs are installed.
+  community.general.zypper:
+    name:
+      - gcc
+      - glibc
+      - make
+      - wget
+      - unzip
+      - apache2
+      - apache2-utils
+      - php7
+      - apache2-mod_php7
+      - gd
+      - gd-devel
+      - tar
+      - gzip
+    state: present
+  become: true
+
+- name: Ensure source directory is present.
+  file:
+    path: "{{ src_dir }}"
+    mode: u=rwX,g=rwX,o=rX
+    state: directory
+    group: users
+  become: yes
+
+- name: Ensure source is downloaded.
+  get_url:
+    url: "https://github.com/NagiosEnterprises/nagioscore/archive/\
+          nagios-{{ nagios_ver }}.tar.gz"
+    dest: "{{ src_dir }}/"
+    checksum: sha256:{{ nagios_sha }}
+  retries: 6
+  delay: 3
+  register: nagios_dl
+
+- name: Register nagios source fact.
+  set_fact:
+    nagios_src: "{{ src_dir }}/nagioscore-nagios-{{ nagios_ver }}"
+
+- name: Unarchive nagios contents.
+  unarchive:
+    remote_src: yes
+    dest: "{{ src_dir }}"
+    src: "{{ nagios_dl.dest }}"
+    creates: "{{ nagios_src }}"
+    mode: u=rwX,g=rwX,o=rX
+
+- name: Configure nagios for compilation.
+  command: ./configure --with-httpd-conf=/etc/apache2/vhosts.d
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: "{{ nagios_src }}/Makefile"
+
+- name: Compile nagios.
+  command: make all
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: "{{ nagios_src }}/base/nagios"
+
+- name: Creat nagios group.
+  group:
+    name: nagios
+    system: false
+    state: present
+  become: true
+
+- name: Add wwwrun to nagios group.
+  user:
+    name: wwwrun
+    groups:
+      - nagios
+  notify: apache
+  become: true
+
+- name: Create nagios user.
+  user:
+    name: nagios
+    groups:
+      - nagios
+      - wwwrun
+    system: false
+    state: present
+  become: true
+
+- name: Install nagios binaries.
+  command: make install
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: /usr/local/nagios
+  become: true
+
+- name: Install daemon init files.
+  command: make install-daemoninit
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: /usr/lib/systemd/system/nagios.service
+  become: true
+
+- name: Install external command file.
+  command: make install-commandmode
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: /usr/local/nagios/var/rw/nagios.cmd
+  become: true
+
+- name: Install sample config.
+  command: make install-config
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: /usr/local/nagios/etc/nagios.cfg
+  become: true
+
+- name: Install apache config.
+  command: make install-webconf
+  args:
+    chdir: "{{ nagios_src }}"
+    creates: /etc/apache2/vhosts.d/nagios.conf
+  become: true
+
+- name: Ensure required apache modules are enabled.
+  command: /usr/sbin/a2enmod {{ item }}
+  register: a2enmod
+  changed_when: '"already present" not in a2enmod.stdout'
+  loop:
+    - rewrite
+    - cgi
+    - version
+    - php7
+  become: true
+
+- name: Enable apache service.
+  systemd:
+    name: apache2.service
+    enabled: true
+    state: started
+  become: true
+
+- name: Enable nagios service.
+  systemd:
+    name: nagios.service
+    enabled: true
+    state: started
+  become: true
+
+- name: Add default account to htaccess.
+  shell: echo "password" | htpasswd -ci /usr/local/nagios/etc/htpasswd.users nagiosadmin
+  args:
+    creates: /usr/local/nagios/etc/htpasswd.users
+  become: true

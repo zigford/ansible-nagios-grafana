@@ -1,0 +1,6 @@
+---
+# vars file for nagios
+#
+src_dir: /usr/local/src/nagios
+plugins_ver: 2.3.3
+plugins_sha: 5108751836af1f5f46a819b85ab742e5e0957c3d3c32335453c3e32baa080fd9

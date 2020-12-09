@@ -1,0 +1,99 @@
+---
+# tasks file for nagflux
+
+- name: Set gorepo fact.
+  set_fact:
+    go_repo_path: /usr/local/src/gorepo
+
+- name: Set distro fact.
+  set_fact:
+    distro: "{{ ansible_distribution }}_\
+             {{ ansible_distribution_major_version }}_\
+             {{ ansible_distribution_release }}"
+
+- name: Load distro vars.
+  include_vars:
+    file: "{{ distro }}.yml"
+
+- name: Ensure go repo is added.
+  community.general.zypper_repository:
+    name: go
+    repo: "{{ go_repo_url }}"
+    auto_import_keys: true
+  become: yes
+  when: go_repo_url is defined
+
+- name: Ensure nagflux pre-reqs are installed.
+  community.general.zypper:
+    name:
+      - go
+      - golang-github-influxdata-usage-client
+      - git
+    state: present
+  become: true
+
+- name: Create gorepo directory.
+  file:
+    dest: "{{ go_repo_path }}"
+    state: directory
+    mode: u=rwX,g=rwX,o=
+
+- name: Download nagflux source.
+  shell: GOPATH={{ go_repo_path }} go get -v -u github.com/griesbacher/nagflux
+  args:
+    creates: "{{ go_repo_path }}/src/github.com/griesbacher/nagflux"
+
+- name: Build nagflux.
+  shell: GOPATH={{ go_repo_path }} go build github.com/griesbacher/nagflux
+  args:
+    creates: "{{ go_repo_path }}/bin/nagflux"
+
+- name: Ensure nagflux install directory is created.
+  file:
+    dest: /opt/nagflux
+    state: directory
+    mode: u=rwX,g=rwX,o=rX
+  become: true
+
+- name: Ensure nagflux is installed.
+  copy:
+    remote_src: true
+    src: "{{ go_repo_path }}/bin/nagflux"
+    dest: /opt/nagflux/
+    mode: u=rwx,g=rx,o=rx
+  become: true
+
+- name: Ensure nagflux data directory is present.
+  file:
+    dest: /usr/local/nagios/var/spool/nagfluxperfdata
+    state: directory
+    owner: nagios
+    group: nagios
+    mode: u=rwX,g=rwX,o=rX
+  become: true
+
+- name: Ensure nagflux config is installed.
+  copy:
+    src: config.gcfg
+    dest: /opt/nagflux/config.gcfg
+  become: true
+
+- name: Ensure systemd service is installed.
+  copy:
+    remote_src: true
+    src: "{{ go_repo_path }}\
+           /src/github.com/griesbacher/nagflux/nagflux.service"
+    dest: /usr/lib/systemd/system/
+    mode: u=rwx
+  become: true
+
+- name: Ensure nagflux service is enabled.
+  systemd:
+    daemon_reload: true
+    name: nagflux.service
+    enabled: true
+    state: started
+  become: true
+
+- name: Config perf data between nagflux and nagios
+  import_tasks: nagios_config.yml

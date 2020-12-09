@@ -1,0 +1,4 @@
+---
+
+influx_repo_url: https://download.opensuse.org/repositories/server:/database/SLE_15_SP1/
+go_repo_url: http://download.opensuse.org/repositories/devel:/languages:/go/SLE_15_SP1/
