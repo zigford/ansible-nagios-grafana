@@ -119,8 +119,6 @@
     - grafana_user.status != 200
   register: grafana_user
 
-- debug: var=grafana_user
-
 - name: Set grafana admin password.
   uri:
     url: http://localhost:3000/api/user/password
